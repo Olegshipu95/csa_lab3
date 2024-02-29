@@ -163,6 +163,7 @@ def replace_vars_funcs(terms: list[Term]) -> None:
         if term.term_type is None and not term.converted:
             if term.word in variables:
                 term.word = str(variables[term.word])
+
     for term_index, term in enumerate(terms):
         if term.term_type is None and not term.converted:
             if term.word in functions.keys():
