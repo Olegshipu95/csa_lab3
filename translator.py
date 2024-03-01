@@ -348,7 +348,7 @@ def fix_interrupt_function(terms: list[Term]) -> list[Term]:
     return [*[terms[0]], *terms_interrupt_proc, *terms_not_interrupt_proc]
 
 
-def terms_to_opcodes(terms: list[Term]) -> list[Opcode]:
+def translate_to_opcodes(terms: list[Term]) -> list[Opcode]:
     terms = fix_interrupt_function(terms)
     opcodes = list(map(term_to_opcodes, terms))
     opcodes = fix_addresses_in_opcodes(opcodes)
@@ -358,7 +358,7 @@ def terms_to_opcodes(terms: list[Term]) -> list[Opcode]:
 def translate(source_code: str) -> list[dict]:
     terms = split_to_terms(source_code)
     validate_and_fix_terms(terms)
-    opcodes = terms_to_opcodes(terms)
+    opcodes = translate_to_opcodes(terms)
     commands = []
     for index, opcode in enumerate(opcodes):
         command = {
@@ -390,3 +390,4 @@ if __name__ == "__main__":
     assert len(sys.argv) == 3, "Wrong arguments: translator.py <input_file> <target_file>"
     _, source, target = sys.argv
     main(source, target)
+1

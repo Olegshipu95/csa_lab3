@@ -241,7 +241,6 @@ def opcode_to_alu_opcode(opcode_type: OpcodeType):
 
 
 class ControlUnit:
-
     out_buffer = ""
 
     program_memory_size = None
@@ -264,7 +263,7 @@ class ControlUnit:
         self.program_memory = [{"index": x, "command": 0, "arg": 0} for x in range(self.program_memory_size)]
         self.ps = {"Intr_Req": False, "Intr_On": True}
 
-    def fill_memory(self, opcodes: list) -> None:
+    def fill_command_memory(self, opcodes: list) -> None:
         for opcode in opcodes:
             mem_cell = int(opcode["index"])
             assert 0 <= mem_cell < self.program_memory_size, "Program index out of memory size"
@@ -292,15 +291,15 @@ class ControlUnit:
                     self.ps["Intr_On"] = False
                     self.tokens_handled[index] = True
                     print(interrupt, self.tick_number, self.data_path.pc)
-                    self.tick([lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC)])
-                    self.tick([
+                    self.exec_instruction([
+                        lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC),
                         lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, 1),
                         lambda: self.data_path.signal_latch_i(Selector.I_INC)
                     ])
                     break
         return False
 
-    def tick(self, operations: list[typing.Callable], comment="") -> None:
+    def exec_instruction(self, operations: list[typing.Callable], comment="") -> None:
         self.tick_number += 1
         for operation in operations:
             operation()
@@ -317,132 +316,112 @@ class ControlUnit:
         command = memory_cell["command"]
         arithmetic_operation = opcode_to_alu_opcode(command)
         if arithmetic_operation is not None:
-            self.tick([lambda: self.data_path.signal_alu_operation(arithmetic_operation)])
-            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_ALU)])
-            self.tick([lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)])
-            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
-        elif command == OpcodeType.PUSH:
-            self.tick([lambda: self.data_path.signal_data_wr()])
-            self.tick(
-                [
-                    lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
-                    lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
-                ]
-            )
-            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, memory_cell["arg"])])
-        elif command == OpcodeType.DROP:
-            self.tick([
-                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
+            self.exec_instruction([
+                lambda: self.data_path.signal_alu_operation(arithmetic_operation),
+                lambda: self.data_path.signal_latch_top(Selector.TOP_ALU),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)
             ])
-            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+        elif command == OpcodeType.PUSH:
+            self.exec_instruction([
+                lambda: self.data_path.signal_data_wr(),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
+                lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
+                lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, memory_cell["arg"])])
+        elif command == OpcodeType.DROP:
+            self.exec_instruction([
+                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
         elif command == OpcodeType.OMIT:
             self.out_buffer += chr(self.data_path.next)
-            self.tick([
+            self.exec_instruction([
                 lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
-            ])
-            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
-            self.tick([
+                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM),
                 lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
-            ])
-            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
         elif command == OpcodeType.READ:
-            self.tick([
+            self.exec_instruction([
                 lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
-            ])
-            self.tick([lambda: self.data_path.signal_data_wr()])
-            self.tick(
-                [
-                    lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
-                    lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
-                ]
-            )
-            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, ord(self.IO))])
+                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                lambda: self.data_path.signal_data_wr(),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
+                lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
+                lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, ord(self.IO))])
         elif command == OpcodeType.SWAP:
-            self.tick([lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP)])
-            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT)])
-            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_TEMP)])
+            self.exec_instruction([lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP)])
+            self.exec_instruction([lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT)])
+            self.exec_instruction([lambda: self.data_path.signal_latch_next(Selector.NEXT_TEMP)])
         elif command == OpcodeType.OVER:
-            self.tick([lambda: self.data_path.signal_data_wr()])
-            self.tick([
+            self.exec_instruction([
+                lambda: self.data_path.signal_data_wr(),
                 lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP),
                 lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
-            ])
-            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT)])
-            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_TEMP)])
+                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                lambda: self.data_path.signal_latch_next(Selector.NEXT_TEMP)])
         elif command == OpcodeType.DUP:
-            self.tick([lambda: self.data_path.signal_data_wr()])
-            self.tick([
+            self.exec_instruction([
+                lambda: self.data_path.signal_data_wr(),
                 lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
                 lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
             ])
         elif command == OpcodeType.LOAD:
-            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_MEM)])
+            self.exec_instruction([lambda: self.data_path.signal_latch_top(Selector.TOP_MEM)])
         elif command == OpcodeType.STORE:
-            self.tick([
+            self.exec_instruction([
                 lambda: self.data_path.signal_mem_write(),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
-            ])
-            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
-            self.tick([
-                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
-            ])
-            self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
-        elif command == OpcodeType.POP:
-            self.tick([lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP)])
-            self.tick([
-                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
-            ])
-            self.tick([
+                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
                 lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM),
-                lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_OUT)
-            ])
-            self.tick([lambda: self.data_path.signal_latch_i(Selector.I_INC)])
+                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+        elif command == OpcodeType.POP:
+            self.exec_instruction([
+                lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP),
+                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM),
+                lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_OUT),
+                lambda: self.data_path.signal_latch_i(Selector.I_INC)])
         elif command == OpcodeType.RPOP:
-            self.tick([lambda: self.data_path.signal_latch_i(Selector.I_DEC)])
-            self.tick([
+            self.exec_instruction([
+                lambda: self.data_path.signal_latch_i(Selector.I_DEC),
                 lambda: self.data_path.signal_latch_temp(Selector.TEMP_RETURN),
-                lambda: self.data_path.signal_data_wr()
-            ])
-            self.tick([
+                lambda: self.data_path.signal_data_wr(),
                 lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
                 lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
-            ])
-            self.tick([lambda: self.data_path.signal_latch_top(Selector.TOP_TEMP)])
+                lambda: self.data_path.signal_latch_top(Selector.TOP_TEMP)])
         elif command == OpcodeType.ZJMP:
             if self.data_path.top == 0:
-                self.tick([
+                self.exec_instruction([
                     lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"]),
                     lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
                     lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
                 ])
-                self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+                self.exec_instruction([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
             else:
-                self.tick([
+                self.exec_instruction([
                     lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
                     lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
                 ])
-                self.tick([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+                self.exec_instruction([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
         elif command == OpcodeType.JMP:
-            self.tick([lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"])])
+            self.exec_instruction([lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"])])
         elif command == OpcodeType.CALL:
-            self.tick([lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC)])
-            self.tick([
+            self.exec_instruction([lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC)])
+            self.exec_instruction([
                 lambda: self.data_path.signal_latch_i(Selector.I_INC),
                 lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"])
             ])
         elif command == OpcodeType.DI:
-            self.tick([lambda: self.signal_latch_ps(False)])
+            self.exec_instruction([lambda: self.signal_latch_ps(False)])
         elif command == OpcodeType.EI:
-            self.tick([lambda: self.signal_latch_ps(True)])
+            self.exec_instruction([lambda: self.signal_latch_ps(True)])
         elif command == OpcodeType.RET:
-            self.tick([lambda: self.data_path.signal_latch_i(Selector.I_DEC)])
-            self.tick([lambda: self.signal_latch_pc(Selector.PC_RET)])
+            self.exec_instruction([lambda: self.data_path.signal_latch_i(Selector.I_DEC)])
+            self.exec_instruction([lambda: self.signal_latch_pc(Selector.PC_RET)])
         elif command == OpcodeType.HALT:
             print(self.out_buffer)
             raise StopIteration
@@ -452,7 +431,7 @@ class ControlUnit:
         tos = [self.data_path.top, self.data_path.next, *tos_memory]
         ret_tos = self.data_path.return_stack[self.data_path.i - 1: self.data_path.i - 4: -1]
         state_repr = (
-            "TICK: {:4} | PC: {:3} | PS_REQ {:1} | PS_STATE: {:1} | SP: {:3} | I: {:3} | "
+            "exec_instruction: {:4} | PC: {:3} | PS_REQ {:1} | PS_STATE: {:1} | SP: {:3} | I: {:3} | "
             "TEMP: {:7} | DATA_MEMORY[TOP] {:7} | TOS : {} | RETURN_TOS : {}"
         ).format(
             self.tick_number,
@@ -473,7 +452,7 @@ class ControlUnit:
 def simulation(code: list, limit: int, input_tokens: list[tuple]):
     data_path = DataPath(15000, 15000, 15000)
     control_unit = ControlUnit(data_path, 15000, input_tokens)
-    control_unit.fill_memory(code)
+    control_unit.fill_command_memory(code)
     while control_unit.instruction_number < limit:
         try:
             control_unit.command_cycle()
