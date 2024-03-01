@@ -6,43 +6,65 @@ on:
   pull_request:
     branches: [ "main" ]
 
+
 permissions:
   contents: read
 
 jobs:
   lint:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
     - name: Install poetry
       run: pip install poetry
-    - name: Set up Python 3.11
+    - name: Set up Python 3.12
       uses: actions/setup-python@v4
       with:
-        python-version: "3.11"
+        python-version: "3.12"
         cache: "poetry"
     - name: Install project
       run: |
         poetry install
-    - name: Lint with pylint
+    - name: Lint with ruff
       run: |
-        make lint
+        poetry run python -m ruff interpreter
+        poetry run python -m ruff machine
+
   test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - name: Install poetry
       run: pip install poetry
-    - name: Set up Python 3.1
+    - name: Set up Python 3.12
       uses: actions/setup-python@v4
       with:
-        python-version: "3.11"
+        python-version: "3.12"
         cache: "poetry"
     - name: Install project
       run: |
         poetry install
     - name: Run tests
       run: |
-        make test-cov
+        poetry run pytest
     needs: lint
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install poetry
+        run: pip install poetry
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+          cache: "poetry"
+      - name: Install project
+        run: |
+          poetry install
+      - name: Run tests
+        run: |
+          poetry run coverage run -m pytest --verbose
+          poetry run coverage report
+    needs: test
