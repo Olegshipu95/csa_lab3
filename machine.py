@@ -6,7 +6,7 @@ import typing
 from enum import Enum
 
 import pytest as pytest
-from isa import OpcodeType, read_code
+from isa import OpcodeType, read_binary_code
 
 logger = logging.getLogger("machine_logger")
 logger.setLevel(logging.INFO)
@@ -471,7 +471,8 @@ def main(code_path: str, token_path: str | None) -> None:
         with open(token_path, encoding="utf-8") as file:
             input_text = file.read()
             input_tokens = eval(input_text)
-    code = read_code(code_path)
+    # code = read_code(code_path)
+    code = read_binary_code(code_path)
     output, instr_num = simulation(
         code,
         limit=7000,

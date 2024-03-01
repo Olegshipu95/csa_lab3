@@ -16,7 +16,8 @@ def test_translator_and_machine(golden, caplog):
     with tempfile.TemporaryDirectory() as tmpdirname:
         source = os.path.join(tmpdirname, "source.fth")
         input_stream = os.path.join(tmpdirname, "input.txt")
-        target = os.path.join(tmpdirname, "target.o")
+        target = os.path.join(tmpdirname, "target.bin")
+        description = os.path.join(tmpdirname, "descr.txt")
 
         with open(source, "w", encoding="utf-8") as file:
             file.write(golden["in_source"])
@@ -24,13 +25,13 @@ def test_translator_and_machine(golden, caplog):
             file.write(golden["in_stdin"])
 
         with contextlib.redirect_stdout(io.StringIO()) as stdout:
-            translator.main(source, target)
+            translator.main(source, target, description)
             print("============================================================")
             machine.main(target, input_stream)
 
-        with open(target, encoding="utf-8") as file:
+        with open(description, encoding="utf-8") as file:
             code = file.read()
 
-        assert code == golden.out["out_code"]
+        assert code == golden.out["out_code"], "desc1 " + description + " " + golden.out["out_code"]
         assert stdout.getvalue() == golden.out["out_stdout"]
         assert caplog.text == golden.out["out_log"], "Failed LOG"

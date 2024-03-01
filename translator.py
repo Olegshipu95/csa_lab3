@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import shlex
 import sys
+import struct
 
-from isa import Opcode, OpcodeParam, OpcodeParamType, OpcodeType, TermType, write_code
+from isa import Opcode, OpcodeParam, OpcodeParamType, OpcodeType, TermType, write_code, \
+    get_number_of_OpcodeType
 
 
 class Term:
@@ -355,39 +357,57 @@ def translate_to_opcodes(terms: list[Term]) -> list[Opcode]:
     return [*opcodes, Opcode(OpcodeType.HALT, [])]
 
 
-def translate(source_code: str) -> list[dict]:
+def convert_to_binary(opcode_number: int, index: int, arg: int = 0):
+    # 5 bit - opcode, 15 - address, 12 - arg
+    number = (opcode_number << 27) | (index << 12) | arg
+    binary_struct = struct.pack('<I', (opcode_number << 27) | (index << 12) | arg)
+    return number, binary_struct
+
+
+def translate(source_code: str):
+    bin_log = ["5 bits - opcode, 15 bits - address, 12 bits - argument"]
     terms = split_to_terms(source_code)
     validate_and_fix_terms(terms)
     opcodes = translate_to_opcodes(terms)
-    commands = []
+    binary_data = b''
     for index, opcode in enumerate(opcodes):
-        command = {
-            "index": index,
-            "command": opcode.opcode_type,
-        }
+        arg = 0
         if len(opcode.params):
-            command["arg"] = int(opcode.params[0].value)
-        commands.append(command)
-    return commands
+            arg = int(opcode.params[0].value)
+        opcode_number = get_number_of_OpcodeType(opcode.opcode_type)
+        int_binary, struct_bytes = convert_to_binary(opcode_number, index, arg)
+        binary_data += struct_bytes
+        bin_log.append(format(int_binary, '032b') + " -> opcode: " + opcode.opcode_type + ", opcode number: " + str(
+            opcode_number) + ", memory index: " + str(index) +
+                       ", arg: " + str(arg))
+    return bin_log, binary_data
 
 
-def main(source_file: str, target_file: str) -> None:
+def main(source_file: str, target_file: str, bin_description_file: str | None) -> None:
     global variables, variable_current_address, string_current_address, functions
 
     variables = {}
     variable_current_address = 512
     string_current_address = 0
     functions = {}
-
     with open(source_file, encoding="utf-8") as f:
         source_code = f.read()
-    code = translate(source_code)
+    bin_log, code = translate(source_code)
+    if bin_description_file is not None:
+        with open(bin_description_file, 'w') as file:
+            # Записываем каждую строку из списка в файл
+            for line in bin_log:
+                file.write(line + "\n")
     write_code(target_file, code)
+
     print("source LoC:", len(source_code.split("\n")), "code instr:", len(code))
 
 
 if __name__ == "__main__":
-    assert len(sys.argv) == 3, "Wrong arguments: translator.py <input_file> <target_file>"
-    _, source, target = sys.argv
-    main(source, target)
-1
+    assert 3 <= len(sys.argv) <= 4, "Wrong arguments: translator.py <input_file> <target_file> <bin_desc_file>"
+    if len(sys.argv) == 4:
+        _, source, target, bin_descr_file = sys.argv
+    else:
+        _, source, target = sys.argv
+        bin_descr_file = None
+    main(source, target, bin_descr_file)
