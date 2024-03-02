@@ -541,8 +541,8 @@ def simulation(code: list, limit: int, input_tokens: list[tuple]):
     while control_unit.instuct_number < limit:
         try:
             control_unit.command_cycle()
-            print()
-            print(control_unit.program_memory[control_unit.data_path.pc])
+            # print()
+            # print(control_unit.program_memory[control_unit.data_path.pc])
         except StopIteration:
             break
     return [control_unit.out_buffer, control_unit.instuct_number]
