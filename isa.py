@@ -118,14 +118,14 @@ def read_binary_code(filename: str):
 
     # Расшифровка бинарных данных
     for i in range(0, len(binary_data), 4):  # Предполагается, что каждое значение кодируется 4 байтами
-        struct_bytes = binary_data[i:i + 4]
-        decoded_value = struct.unpack('<I', struct_bytes)[0]
+        struct_bytes = binary_data[i : i + 4]
+        decoded_value = struct.unpack("<I", struct_bytes)[0]
 
         # Извлечение значений из битовых полей
         opcode_number = decoded_value >> 27
         index = (decoded_value >> 12) & 0x7FFF  # Маска для извлечения 15 бит адреса
         arg = decoded_value & 0xFFF  # Маска для извлечения 12 бит аргумента
-        tuple_decode = ({'index': index, 'command': get_opcode_by_number(opcode_number).value, 'arg': arg})
+        tuple_decode = {"index": index, "command": get_opcode_by_number(opcode_number).value, "arg": arg}
         # print(tuple_decode)
         decoded_values.append(tuple_decode)
     return decoded_values

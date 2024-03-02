@@ -123,7 +123,6 @@ class ALU:
 
 
 class DataPath:
-
     memory_size = None
     memory = None
     data_stack_size = None
@@ -291,11 +290,13 @@ class ControlUnit:
                     self.ps["Intr_On"] = False
                     self.tokens_handled[index] = True
                     print(interrupt, self.instuct_number, self.data_path.pc)
-                    self.exec_instruction([
-                        lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC),
-                        lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, 1),
-                        lambda: self.data_path.signal_latch_i(Selector.I_INC)
-                    ])
+                    self.exec_instruction(
+                        [
+                            lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC),
+                            lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, 1),
+                            lambda: self.data_path.signal_latch_i(Selector.I_INC),
+                        ]
+                    )
                     break
         return False
 
@@ -315,123 +316,159 @@ class ControlUnit:
         command = memory_cell["command"]
         arithmetic_operation = opcode_to_alu_opcode(command)
         if arithmetic_operation is not None:
-            self.exec_instruction([
-                lambda: self.data_path.signal_alu_operation(arithmetic_operation),
-                lambda: self.data_path.signal_latch_top(Selector.TOP_ALU),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
-                lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)
-            ])
+            self.exec_instruction(
+                [
+                    lambda: self.data_path.signal_alu_operation(arithmetic_operation),
+                    lambda: self.data_path.signal_latch_top(Selector.TOP_ALU),
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                    lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM),
+                ]
+            )
         elif command == OpcodeType.PUSH:
-            self.exec_instruction([
-                lambda: self.data_path.signal_data_wr(),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
-                lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
-                lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, memory_cell["arg"])])
+            self.exec_instruction(
+                [
+                    lambda: self.data_path.signal_data_wr(),
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
+                    lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
+                    lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, memory_cell["arg"]),
+                ]
+            )
         elif command == OpcodeType.DROP:
-            self.exec_instruction([
-                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
-                lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+            self.exec_instruction(
+                [
+                    lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                    lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM),
+                ]
+            )
         elif command == OpcodeType.OMIT:
             self.out_buffer += chr(self.data_path.next)
-            self.exec_instruction([
-                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
-                lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM),
-                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
-                lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+            self.exec_instruction(
+                [
+                    lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                    lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM),
+                    lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                    lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM),
+                ]
+            )
         elif command == OpcodeType.READ:
-            self.exec_instruction([
-                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
-                lambda: self.data_path.signal_data_wr(),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
-                lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
-                lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, ord(self.IO))])
+            self.exec_instruction(
+                [
+                    lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                    lambda: self.data_path.signal_data_wr(),
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
+                    lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
+                    lambda: self.data_path.signal_latch_top(Selector.TOP_IMMEDIATE, ord(self.IO)),
+                ]
+            )
         elif command == OpcodeType.SWAP:
-            self.exec_instruction([
-                lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP),
-                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_next(Selector.NEXT_TEMP)
-            ])
+            self.exec_instruction(
+                [
+                    lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP),
+                    lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                    lambda: self.data_path.signal_latch_next(Selector.NEXT_TEMP),
+                ]
+            )
         elif command == OpcodeType.OVER:
-            self.exec_instruction([
-                lambda: self.data_path.signal_data_wr(),
-                lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
-                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_next(Selector.NEXT_TEMP)])
+            self.exec_instruction(
+                [
+                    lambda: self.data_path.signal_data_wr(),
+                    lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP),
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
+                    lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                    lambda: self.data_path.signal_latch_next(Selector.NEXT_TEMP),
+                ]
+            )
         elif command == OpcodeType.DUP:
-            self.exec_instruction([
-                lambda: self.data_path.signal_data_wr(),
-                lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
-            ])
+            self.exec_instruction(
+                [
+                    lambda: self.data_path.signal_data_wr(),
+                    lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
+                ]
+            )
         elif command == OpcodeType.LOAD:
             self.exec_instruction([lambda: self.data_path.signal_latch_top(Selector.TOP_MEM)])
         elif command == OpcodeType.STORE:
-            self.exec_instruction([
-                lambda: self.data_path.signal_mem_write(),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
-                lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM),
-                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
-                lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
+            self.exec_instruction(
+                [
+                    lambda: self.data_path.signal_mem_write(),
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                    lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM),
+                    lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                    lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM),
+                ]
+            )
         elif command == OpcodeType.POP:
-            self.exec_instruction([
-                lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP),
-                lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
-                lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM),
-                lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_OUT),
-                lambda: self.data_path.signal_latch_i(Selector.I_INC)])
+            self.exec_instruction(
+                [
+                    lambda: self.data_path.signal_latch_temp(Selector.TEMP_TOP),
+                    lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                    lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM),
+                    lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_OUT),
+                    lambda: self.data_path.signal_latch_i(Selector.I_INC),
+                ]
+            )
         elif command == OpcodeType.RPOP:
-            self.exec_instruction([
-                lambda: self.data_path.signal_latch_i(Selector.I_DEC),
-                lambda: self.data_path.signal_latch_temp(Selector.TEMP_RETURN),
-                lambda: self.data_path.signal_data_wr(),
-                lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
-                lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
-                lambda: self.data_path.signal_latch_top(Selector.TOP_TEMP)])
+            self.exec_instruction(
+                [
+                    lambda: self.data_path.signal_latch_i(Selector.I_DEC),
+                    lambda: self.data_path.signal_latch_temp(Selector.TEMP_RETURN),
+                    lambda: self.data_path.signal_data_wr(),
+                    lambda: self.data_path.signal_latch_next(Selector.NEXT_TOP),
+                    lambda: self.data_path.signal_latch_sp(Selector.SP_INC),
+                    lambda: self.data_path.signal_latch_top(Selector.TOP_TEMP),
+                ]
+            )
         elif command == OpcodeType.ZJMP:
             if self.data_path.top == 0:
-                self.exec_instruction([
-                    lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"]),
-                    lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                    lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
-                ])
+                self.exec_instruction(
+                    [
+                        lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"]),
+                        lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                        lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                    ]
+                )
                 self.exec_instruction([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
             else:
-                self.exec_instruction([
-                    lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
-                    lambda: self.data_path.signal_latch_sp(Selector.SP_DEC)
-                ])
+                self.exec_instruction(
+                    [
+                        lambda: self.data_path.signal_latch_top(Selector.TOP_NEXT),
+                        lambda: self.data_path.signal_latch_sp(Selector.SP_DEC),
+                    ]
+                )
                 self.exec_instruction([lambda: self.data_path.signal_latch_next(Selector.NEXT_MEM)])
         elif command == OpcodeType.JMP:
             self.exec_instruction([lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"])])
         elif command == OpcodeType.CALL:
-            self.exec_instruction([
-                lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC),
-                lambda: self.data_path.signal_latch_i(Selector.I_INC),
-                lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"])
-            ])
+            self.exec_instruction(
+                [
+                    lambda: self.data_path.signal_ret_wr(Selector.RET_STACK_PC),
+                    lambda: self.data_path.signal_latch_i(Selector.I_INC),
+                    lambda: self.signal_latch_pc(Selector.PC_IMMEDIATE, memory_cell["arg"]),
+                ]
+            )
         elif command == OpcodeType.DI:
             self.exec_instruction([lambda: self.signal_latch_ps(False)])
         elif command == OpcodeType.EI:
             self.exec_instruction([lambda: self.signal_latch_ps(True)])
         elif command == OpcodeType.RET:
-            self.exec_instruction([
-                lambda: self.data_path.signal_latch_i(Selector.I_DEC),
-                lambda: self.signal_latch_pc(Selector.PC_RET)])
+            self.exec_instruction(
+                [lambda: self.data_path.signal_latch_i(Selector.I_DEC), lambda: self.signal_latch_pc(Selector.PC_RET)]
+            )
         elif command == OpcodeType.HALT:
             print(self.out_buffer)
             raise StopIteration
 
     def __print__(self, comment: str) -> None:
-        tos_memory = self.data_path.data_stack[self.data_path.sp - 1: self.data_path.sp - 4: -1]
+        tos_memory = self.data_path.data_stack[self.data_path.sp - 1 : self.data_path.sp - 4 : -1]
         tos = [self.data_path.top, self.data_path.next, *tos_memory]
-        ret_tos = self.data_path.return_stack[self.data_path.i - 1: self.data_path.i - 4: -1]
+        ret_tos = self.data_path.return_stack[self.data_path.i - 1 : self.data_path.i - 4 : -1]
         state_repr = (
             "exec_instruction: {:4} | PC: {:3} | PS_REQ {:1} | PS_STATE: {:1} | SP: {:3} | I: {:3} | "
             "TEMP: {:7} | DATA_MEMORY[TOP]: {:7} | TOS : {} | RETURN_TOS : {}"
@@ -446,7 +483,6 @@ class ControlUnit:
             self.data_path.memory[self.data_path.top] if self.data_path.top < self.data_path.memory_size else "?",
             str(tos),
             str(ret_tos),
-
         )
         logger.info(state_repr + " " + comment)
 
