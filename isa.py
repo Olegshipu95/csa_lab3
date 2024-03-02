@@ -54,7 +54,7 @@ class OpcodeType(str, Enum):
         return str(self.value)
 
 
-def get_number_of_OpcodeType(opcode: OpcodeType) -> int:
+def get_number_of_opcodeType(opcode: OpcodeType) -> int:
     return list(OpcodeType).index(opcode)
 
 
@@ -126,7 +126,6 @@ def read_binary_code(filename: str):
         index = (decoded_value >> 12) & 0x7FFF  # Маска для извлечения 15 бит адреса
         arg = decoded_value & 0xFFF  # Маска для извлечения 12 бит аргумента
         tuple_decode = {"index": index, "command": get_opcode_by_number(opcode_number).value, "arg": arg}
-        # print(tuple_decode)
         decoded_values.append(tuple_decode)
     return decoded_values
 

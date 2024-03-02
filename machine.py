@@ -311,10 +311,7 @@ class ControlUnit:
         self.check_for_interrupts()
         self.signal_latch_pc(Selector.PC_INC)
 
-    def decode_and_execute_instruction(self) -> None:
-        memory_cell = self.program_memory[self.data_path.pc]
-        command = memory_cell["command"]
-        arithmetic_operation = opcode_to_alu_opcode(command)
+    def decode_inst(self, memory_cell, command, arithmetic_operation):
         if arithmetic_operation is not None:
             self.exec_instruction(
                 [
@@ -465,6 +462,13 @@ class ControlUnit:
             print(self.out_buffer)
             raise StopIteration
 
+    def decode_and_execute_instruction(self) -> None:
+        memory_cell = self.program_memory[self.data_path.pc]
+        command = memory_cell["command"]
+        arithmetic_operation = opcode_to_alu_opcode(command)
+        self.decode_inst(memory_cell, command, arithmetic_operation)
+
+
     def __print__(self, comment: str) -> None:
         tos_memory = self.data_path.data_stack[self.data_path.sp - 1 : self.data_path.sp - 4 : -1]
         tos = [self.data_path.top, self.data_path.next, *tos_memory]
@@ -507,7 +511,6 @@ def main(code_path: str, token_path: str | None) -> None:
         with open(token_path, encoding="utf-8") as file:
             input_text = file.read()
             input_tokens = eval(input_text)
-    # code = read_code(code_path)
     code = read_binary_code(code_path)
     output, instr_num = simulation(
         code,

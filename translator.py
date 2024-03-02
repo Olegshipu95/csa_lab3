@@ -4,7 +4,7 @@ import shlex
 import sys
 import struct
 
-from isa import Opcode, OpcodeParam, OpcodeParamType, OpcodeType, TermType, write_code, get_number_of_OpcodeType
+from isa import Opcode, OpcodeParam, OpcodeParamType, OpcodeType, TermType, write_code, get_number_of_opcodeType
 
 
 class Term:
@@ -373,7 +373,7 @@ def translate(source_code: str):
         arg = 0
         if len(opcode.params):
             arg = int(opcode.params[0].value)
-        opcode_number = get_number_of_OpcodeType(opcode.opcode_type)
+        opcode_number = get_number_of_opcodeType(opcode.opcode_type)
         int_binary, struct_bytes = convert_to_binary(opcode_number, index, arg)
         binary_data += struct_bytes
         bin_log.append(
