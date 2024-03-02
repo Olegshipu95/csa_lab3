@@ -1,6 +1,7 @@
 from __future__ import annotations
-import struct
+
 import json
+import struct
 from enum import Enum
 
 
@@ -54,7 +55,7 @@ class OpcodeType(str, Enum):
         return str(self.value)
 
 
-def get_number_of_opcodeType(opcode: OpcodeType) -> int:
+def get_number_of_opcode_type(opcode: OpcodeType) -> int:
     return list(OpcodeType).index(opcode)
 
 
